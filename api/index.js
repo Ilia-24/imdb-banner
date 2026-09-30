@@ -1,34 +1,40 @@
 export default async function handler(req, res) {
   try {
-    // Разбираем URL для извлечения параметров (так как req.query отсутствует в чистом Node.js)
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const id = url.searchParams.get('id');
-
-    // Получаем ID фильма (поддерживает и tt0111161, и tt0111161.png)
     const cleanId = id ? id.replace('.png', '') : 'tt0111161';
 
-    // Запрашиваем данные напрямую с IMDb
-    const response = await fetch(`https://www.imdb.com/title/${cleanId}/`, {
+    // Запрос к GraphQL API IMDb
+    const response = await fetch('https://api.graphql.imdb.com/', {
+      method: 'POST',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9'
-      }
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      body: JSON.stringify({
+        query: `
+          query GetTitle($id: ID!) {
+            title(id: $id) {
+              titleText { text }
+              ratingsSummary {
+                aggregateRating
+                voteCount
+              }
+            }
+          }
+        `,
+        variables: { id: cleanId }
+      })
     });
 
-    const html = await response.text();
+    const result = await response.json();
+    const titleData = result?.data?.title;
 
-    // Парсим название фильма и рейтинг напрямую из HTML IMDb
-    const titleMatch = html.match(/<title>(.*?)<\/title>/);
-    let title = titleMatch ? titleMatch[1].replace(' - IMDb', '').trim() : 'Movie Title';
-
-    const ratingMatch = html.match(/"ratingValue":\s*"?([\d.]+)"?/);
-    const rating = ratingMatch ? ratingMatch[1] : 'N/A';
-
-    const votesMatch = html.match(/"ratingCount":\s*(\d+)/);
-    const rawVotes = votesMatch ? parseInt(votesMatch[1], 10) : null;
+    const title = titleData?.titleText?.text || 'Movie Title';
+    const rating = titleData?.ratingsSummary?.aggregateRating ? titleData.ratingsSummary.aggregateRating.toFixed(1) : 'N/A';
+    const rawVotes = titleData?.ratingsSummary?.voteCount;
     const votes = rawVotes ? rawVotes.toLocaleString('en-US') : 'N/A';
 
-    // Генерируем красивую SVG-картинку
     const svg = `
       <svg width="300" height="80" xmlns="http://www.w3.org/2000/svg">
         <rect width="100%" height="100%" fill="#1f1f1f" rx="8"/>
@@ -38,7 +44,6 @@ export default async function handler(req, res) {
       </svg>
     `.trim();
 
-    // Отдаем SVG пользователю
     res.setHeader('Content-Type', 'image/svg+xml');
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
     res.status(200).send(svg);
