@@ -1,25 +1,22 @@
-const micro = require('micro');
-
-// Импортируем обработчик (проверяем оба возможных пути)
-let handler;
-try {
-  handler = require('./api/index.js');
-} catch (e) {
-  try {
-    handler = require('./api/index');
-  } catch (err) {
-    handler = require('./api');
-  }
-}
-
+const http = require('http');
 const port = process.env.PORT || 3000;
-const server = micro(async (req, res) => {
-  if (typeof handler === 'function') {
-    return handler(req, res);
-  } else if (handler && typeof handler.default === 'function') {
-    return handler.default(req, res);
-  } else {
-    res.end('Server is working!');
+
+const server = http.createServer(async (req, res) => {
+  try {
+    // Динамический импорт для поддержки ES-модулей Vercel
+    const handlerModule = await import('./api/index.js');
+    const handler = handlerModule.default || handlerModule;
+    
+    if (typeof handler === 'function') {
+      await handler(req, res);
+    } else {
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('Server is live');
+    }
+  } catch (err) {
+    console.error('Error handling request:', err);
+    res.writeHead(500, { 'Content-Type': 'text/plain' });
+    res.end('Internal Server Error: ' + err.message);
   }
 });
 
