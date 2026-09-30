@@ -1,17 +1,22 @@
 const http = require('http');
 const port = process.env.PORT || 3000;
 
-// Маскируем запросы сервера под обычный браузер
-global.fetch = (originalFetch => (url, opts = {}) => {
-  opts.headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    ...opts.headers,
+// Маскируем все серверные запросы под обычный браузер
+if (global.fetch) {
+  const originalFetch = global.fetch;
+  global.fetch = (url, opts = {}) => {
+    opts = opts || {};
+    opts.headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      ...opts.headers,
+    };
+    return originalFetch(url, opts);
   };
-  return originalFetch(url, opts);
-})(global.fetch || fetch);
+}
 
 const server = http.createServer(async (req, res) => {
-  // Эмуляция методов Express/Vercel
+  // Эмуляция методов Express / Vercel API
   res.status = function (statusCode) {
     res.statusCode = statusCode;
     return res;
