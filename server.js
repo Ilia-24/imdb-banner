@@ -1,14 +1,14 @@
 const http = require('http');
 const port = process.env.PORT || 3000;
 
-// Маскируем все серверные запросы под обычный браузер
+// Маскируем все запросы под обычный браузер
 if (global.fetch) {
   const originalFetch = global.fetch;
   global.fetch = (url, opts = {}) => {
     opts = opts || {};
     opts.headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       ...opts.headers,
     };
     return originalFetch(url, opts);
@@ -16,7 +16,7 @@ if (global.fetch) {
 }
 
 const server = http.createServer(async (req, res) => {
-  // Эмуляция методов Express / Vercel API
+  // Эмуляция Express/Vercel
   res.status = function (statusCode) {
     res.statusCode = statusCode;
     return res;
@@ -48,8 +48,8 @@ const server = http.createServer(async (req, res) => {
       res.status(200).send('Server is live');
     }
   } catch (err) {
-    console.error('Error handling request:', err);
-    res.status(500).send('Internal Server Error: ' + err.message);
+    console.error('CRITICAL HANDLER ERROR:', err);
+    res.status(500).send('Handler Error: ' + err.stack || err.message);
   }
 });
 
