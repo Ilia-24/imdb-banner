@@ -4,9 +4,16 @@ export default async function handler(req, res) {
     const id = url.searchParams.get('id');
     const cleanId = id ? id.replace('.png', '') : 'tt0111161';
 
+    // Отримуем параметри стилю з URL (або беремо значення за замовчуванням)
+    const bgColor = '#' + (url.searchParams.get('bg') || '121212');
+    const textColor = '#' + (url.searchParams.get('text') || 'ffffff');
+    const width = url.searchParams.get('w') || '120';
+    const height = url.searchParams.get('h') || '36';
+    const rx = url.searchParams.get('rx') || '6';
+
     let rating = 'N/A';
 
-    // Получаем рейтинг через GraphQL API IMDb
+    // Отримуємо рейтинг через GraphQL API IMDb
     try {
       const gqlResponse = await fetch('https://api.graphql.imdb.com/', {
         method: 'POST',
@@ -42,18 +49,18 @@ export default async function handler(req, res) {
       console.error('GraphQL rating fetch failed:', e);
     }
 
-    // Минималистичный баннер (100x32 пикселя): плашка IMDb + число рейтинга
+    // Динамічний SVG баннер
     const svg = `
-      <svg width="100" height="32" viewBox="0 0 100 32" xmlns="http://www.w3.org/2000/svg">
+      <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
         <!-- Фон баннера -->
-        <rect width="100%" height="100%" fill="#121212" rx="6"/>
+        <rect width="100%" height="100%" fill="${bgColor}" rx="${rx}"/>
         
-        <!-- Жёлтая плашка IMDb -->
-        <rect x="6" y="6" width="44" height="20" fill="#f5c518" rx="3"/>
-        <text x="28" y="20" font-family="Impact, Arial Black, sans-serif" font-size="11" font-weight="bold" fill="#000000" text-anchor="middle">IMDb</text>
+        <!-- Жовта плашка IMDb -->
+        <rect x="8" y="${(height - 20) / 2}" width="44" height="20" fill="#f5c518" rx="3"/>
+        <text x="30" y="${(height - 20) / 2 + 14}" font-family="Impact, Arial Black, sans-serif" font-size="11" font-weight="bold" fill="#000000" text-anchor="middle">IMDb</text>
         
-        <!-- Число рейтинга -->
-        <text x="73" y="21" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">${rating}</text>
+        <!-- Число рейтингу -->
+        <text x="${Number(width) - 25}" y="${(height / 2) + 5}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${textColor}" text-anchor="middle">${rating}</text>
       </svg>
     `.trim();
 
