@@ -1,8 +1,17 @@
 const http = require('http');
 const port = process.env.PORT || 3000;
 
+// Маскируем запросы сервера под обычный браузер
+global.fetch = (originalFetch => (url, opts = {}) => {
+  opts.headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    ...opts.headers,
+  };
+  return originalFetch(url, opts);
+})(global.fetch || fetch);
+
 const server = http.createServer(async (req, res) => {
-  // Добавляем обёртки для совместимости с Express/Vercel API
+  // Эмуляция методов Express/Vercel
   res.status = function (statusCode) {
     res.statusCode = statusCode;
     return res;
