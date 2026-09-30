@@ -4,16 +4,18 @@ export default async function handler(req, res) {
     const id = url.searchParams.get('id');
     const cleanId = id ? id.replace('.png', '') : 'tt0111161';
 
-    // Отримуем параметри стилю з URL (або беремо значення за замовчуванням)
+    // Только 3 понятных цвета и размеры
     const bgColor = '#' + (url.searchParams.get('bg') || '121212');
-    const textColor = '#' + (url.searchParams.get('text') || 'ffffff');
+    const imdbTextColor = '#' + (url.searchParams.get('imdb_text') || 'f5c518');
+    const ratingTextColor = '#' + (url.searchParams.get('text') || 'ffffff');
+
     const width = url.searchParams.get('w') || '120';
     const height = url.searchParams.get('h') || '36';
     const rx = url.searchParams.get('rx') || '6';
 
     let rating = 'N/A';
 
-    // Отримуємо рейтинг через GraphQL API IMDb
+    // Получаем рейтинг с IMDb
     try {
       const gqlResponse = await fetch('https://api.graphql.imdb.com/', {
         method: 'POST',
@@ -49,18 +51,17 @@ export default async function handler(req, res) {
       console.error('GraphQL rating fetch failed:', e);
     }
 
-    // Динамічний SVG баннер
+    // Чистый SVG баннер
     const svg = `
       <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
         <!-- Фон баннера -->
         <rect width="100%" height="100%" fill="${bgColor}" rx="${rx}"/>
         
-        <!-- Жовта плашка IMDb -->
-        <rect x="8" y="${(height - 20) / 2}" width="44" height="20" fill="#f5c518" rx="3"/>
-        <text x="30" y="${(height - 20) / 2 + 14}" font-family="Impact, Arial Black, sans-serif" font-size="11" font-weight="bold" fill="#000000" text-anchor="middle">IMDb</text>
+        <!-- Надпись IMDb -->
+        <text x="32" y="${(height / 2) + 4}" font-family="Impact, Arial Black, sans-serif" font-size="14" font-weight="bold" fill="${imdbTextColor}" text-anchor="middle">IMDb</text>
         
-        <!-- Число рейтингу -->
-        <text x="${Number(width) - 25}" y="${(height / 2) + 5}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${textColor}" text-anchor="middle">${rating}</text>
+        <!-- Число рейтинга -->
+        <text x="${Number(width) - 25}" y="${(height / 2) + 4}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${ratingTextColor}" text-anchor="middle">${rating}</text>
       </svg>
     `.trim();
 
