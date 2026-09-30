@@ -4,11 +4,9 @@ export default async function handler(req, res) {
     const id = url.searchParams.get('id');
     const cleanId = id ? id.replace('.png', '') : 'tt0111161';
 
-    let title = 'Movie Title';
     let rating = 'N/A';
-    let votes = 'N/A';
 
-    // 1. Пробуем получить данные через GraphQL API с полным набором заголовков
+    // Получаем рейтинг через GraphQL API IMDb
     try {
       const gqlResponse = await fetch('https://api.graphql.imdb.com/', {
         method: 'POST',
@@ -23,10 +21,8 @@ export default async function handler(req, res) {
           query: `
             query GetTitle($id: ID!) {
               title(id: $id) {
-                titleText { text }
                 ratingsSummary {
                   aggregateRating
-                  voteCount
                 }
               }
             }
@@ -37,43 +33,27 @@ export default async function handler(req, res) {
 
       if (gqlResponse.ok) {
         const gqlData = await gqlResponse.json();
-        const titleData = gqlData?.data?.title;
-        if (titleData) {
-          title = titleData.titleText?.text || title;
-          rating = titleData.ratingsSummary?.aggregateRating ? titleData.ratingsSummary.aggregateRating.toFixed(1) : rating;
-          const rawVotes = titleData.ratingsSummary?.voteCount;
-          votes = rawVotes ? rawVotes.toLocaleString('en-US') : votes;
+        const aggregateRating = gqlData?.data?.title?.ratingsSummary?.aggregateRating;
+        if (aggregateRating) {
+          rating = aggregateRating.toFixed(1);
         }
       }
     } catch (e) {
-      console.error('GraphQL fetch failed, falling back to suggestion API:', e);
+      console.error('GraphQL rating fetch failed:', e);
     }
 
-    // 2. Если название всё ещё дефолтное — делаем фоллбек на надёжный Suggestion API IMDb
-    if (title === 'Movie Title') {
-      const suggestUrl = `https://v3.sg.media-imdb.com/suggestion/x/${cleanId}.json`;
-      const sgResponse = await fetch(suggestUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-        }
-      });
-
-      if (sgResponse.ok) {
-        const sgData = await sgResponse.json();
-        const movie = sgData?.d?.find(item => item.id === cleanId);
-        if (movie) {
-          title = movie.l || title;
-        }
-      }
-    }
-
-    // Генерируем красивый SVG баннер
+    // Минималистичный баннер (100x32 пикселя): плашка IMDb + число рейтинга
     const svg = `
-      <svg width="300" height="80" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100%" height="100%" fill="#1f1f1f" rx="8"/>
-        <text x="15" y="30" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#f5c518">${title.length > 24 ? title.substring(0, 22) + '...' : title}</text>
-        <text x="15" y="58" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#ffffff">★ ${rating}</text>
-        <text x="100" y="56" font-family="Arial, sans-serif" font-size="12" fill="#aaaaaa">(${votes} votes)</text>
+      <svg width="100" height="32" viewBox="0 0 100 32" xmlns="http://www.w3.org/2000/svg">
+        <!-- Фон баннера -->
+        <rect width="100%" height="100%" fill="#121212" rx="6"/>
+        
+        <!-- Жёлтая плашка IMDb -->
+        <rect x="6" y="6" width="44" height="20" fill="#f5c518" rx="3"/>
+        <text x="28" y="20" font-family="Impact, Arial Black, sans-serif" font-size="11" font-weight="bold" fill="#000000" text-anchor="middle">IMDb</text>
+        
+        <!-- Число рейтинга -->
+        <text x="73" y="21" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">${rating}</text>
       </svg>
     `.trim();
 
