@@ -4,37 +4,70 @@ export default async function handler(req, res) {
     const id = url.searchParams.get('id');
     const cleanId = id ? id.replace('.png', '') : 'tt0111161';
 
-    // Запрос к GraphQL API IMDb
-    const response = await fetch('https://api.graphql.imdb.com/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      },
-      body: JSON.stringify({
-        query: `
-          query GetTitle($id: ID!) {
-            title(id: $id) {
-              titleText { text }
-              ratingsSummary {
-                aggregateRating
-                voteCount
+    let title = 'Movie Title';
+    let rating = 'N/A';
+    let votes = 'N/A';
+
+    // 1. Пробуем получить данные через GraphQL API с полным набором заголовков
+    try {
+      const gqlResponse = await fetch('https://api.graphql.imdb.com/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+          'x-imdb-client-name': 'imdb-web-next',
+          'x-imdb-user-country': 'US'
+        },
+        body: JSON.stringify({
+          query: `
+            query GetTitle($id: ID!) {
+              title(id: $id) {
+                titleText { text }
+                ratingsSummary {
+                  aggregateRating
+                  voteCount
+                }
               }
             }
-          }
-        `,
-        variables: { id: cleanId }
-      })
-    });
+          `,
+          variables: { id: cleanId }
+        })
+      });
 
-    const result = await response.json();
-    const titleData = result?.data?.title;
+      if (gqlResponse.ok) {
+        const gqlData = await gqlResponse.json();
+        const titleData = gqlData?.data?.title;
+        if (titleData) {
+          title = titleData.titleText?.text || title;
+          rating = titleData.ratingsSummary?.aggregateRating ? titleData.ratingsSummary.aggregateRating.toFixed(1) : rating;
+          const rawVotes = titleData.ratingsSummary?.voteCount;
+          votes = rawVotes ? rawVotes.toLocaleString('en-US') : votes;
+        }
+      }
+    } catch (e) {
+      console.error('GraphQL fetch failed, falling back to suggestion API:', e);
+    }
 
-    const title = titleData?.titleText?.text || 'Movie Title';
-    const rating = titleData?.ratingsSummary?.aggregateRating ? titleData.ratingsSummary.aggregateRating.toFixed(1) : 'N/A';
-    const rawVotes = titleData?.ratingsSummary?.voteCount;
-    const votes = rawVotes ? rawVotes.toLocaleString('en-US') : 'N/A';
+    // 2. Если название всё ещё дефолтное — делаем фоллбек на надёжный Suggestion API IMDb
+    if (title === 'Movie Title') {
+      const suggestUrl = `https://v3.sg.media-imdb.com/suggestion/x/${cleanId}.json`;
+      const sgResponse = await fetch(suggestUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        }
+      });
 
+      if (sgResponse.ok) {
+        const sgData = await sgResponse.json();
+        const movie = sgData?.d?.find(item => item.id === cleanId);
+        if (movie) {
+          title = movie.l || title;
+        }
+      }
+    }
+
+    // Генерируем красивый SVG баннер
     const svg = `
       <svg width="300" height="80" xmlns="http://www.w3.org/2000/svg">
         <rect width="100%" height="100%" fill="#1f1f1f" rx="8"/>
